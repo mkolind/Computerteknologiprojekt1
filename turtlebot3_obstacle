@@ -19,14 +19,15 @@
 
 import rospy
 import math
+import time 
 from sensor_msgs.msg import LaserScan
 from geometry_msgs.msg import Twist
 
-LINEAR_VEL = 0.4
+LINEAR_VEL = 0.8
 STOP_DISTANCE = 0.2
 LIDAR_ERROR = 0.05
 SAFE_STOP_DISTANCE = STOP_DISTANCE + LIDAR_ERROR
-SAFE_TURN_DISTANCE = 1
+SAFE_TURN_DISTANCE = SAFE_STOP_DISTANCE * 2
 
 
 # Code for RGB-sensor,
@@ -47,9 +48,7 @@ class RGBsensor():
         # 0b00101(5) Operation: RGB, Range: 375 lux, Res: 16 Bits
         self.bus.write_byte_data(0x44, 0x01, 0x05)
 
-        print("Reading colour values and displaying them in a new window\n")
-        print("data til mathias: ", self.bus.read_byte_data(0x44, 0x01))
-
+   
     # Reads reading from RGB sensor
     # return as tuple (r, g, b)
     def getColour(self):
@@ -99,25 +98,39 @@ class Obstacle():
         
         return scan_filter
 
-    def turn(self, factor):
-        twist = Twist()
-        twist.linear.x = 0
-        twist.angular.z = 1*factor
-        self._cmd_pub.publish(twist)
-        turtlebot_moving = False
-        #rospy.loginfo('Turning')
+    def check_collision(self):
+        full_dist = self.get_scan(360)
+        # rospy.loginfo('Min dist: %f', min(full_dist))
+        if(min(full_dist) < 0.097):
+            return True
+        return False
+        
 
     def obstacle(self):
         twist = Twist()
         turtlebot_moving = True
         RGB_cooldown = 10
+        TMR_cooldown = 4
         victims_found = 0
+        collision_counter = 0
+        collision_cooldown = 0
         lightSensor = RGBsensor()
+        run_time = 60 * 2
+        t_end = time.time() + run_time # 60 seconds * 2
         
-        while not rospy.is_shutdown():
+        accum_speed = 0
+        speed_updates = 0
+
+        while (not rospy.is_shutdown()) and (time.time() < t_end):
             lightData = lightSensor.getColour() 
             #rospy.loginfo(lightData)
-            
+            if(self.check_collision() and collision_cooldown < 1):
+                collision_counter += 1
+                collision_cooldown = 5
+                rospy.loginfo('COLLISION, total collisions: %i', collision_counter)
+            collision_cooldown -= 1
+
+
             if RGB_cooldown <= 0:
                 if lightData[0] > 80: # 0: R, 1: G, 2: B
                     victims_found += 1
@@ -127,7 +140,8 @@ class Obstacle():
                 RGB_cooldown -= 1
 
             lidar_distances = self.get_scan(180)
-            front_cone = lidar_distances[67:113] # 45 grader
+            small_front_cone = lidar_distances[80:100] # 20 grader
+            front_cone = lidar_distances[60:120] # 60 grader
             left_cone = lidar_distances[0:67] # 67 grader
             right_cone = lidar_distances[113:180] # sjovt nok ogs 67
 
@@ -135,7 +149,7 @@ class Obstacle():
                 min_distance = min(front_cone)
                 min_index = lidar_distances.index(min_distance)
                 if min_distance < SAFE_STOP_DISTANCE:
-                    twist.linear.x = 0
+                    twist.linear.x = -LINEAR_VEL * 0.2
                     turtlebot_moving = False
                 else:
                     if min_distance < SAFE_TURN_DISTANCE:
@@ -145,20 +159,23 @@ class Obstacle():
                             factor = -1
 
                         twist.linear.x = LINEAR_VEL
-                        twist.angular.z = 0.7*factor
+                        twist.angular.z = factor
                         
                     else: 
                         twist.linear.x = LINEAR_VEL
                         twist.angular.z = 0.0
-                        turtlebot_moving = True
+                    
+                    TMR_cooldown = 4
+                    turtlebot_moving = True
                     
 
                 
 
             else:
                 min_distance = min(lidar_distances)
-                if min(front_cone) > SAFE_STOP_DISTANCE*2:
+                if min(small_front_cone) > SAFE_STOP_DISTANCE*2:
                     twist.linear.x = LINEAR_VEL
+                    TMR_cooldown = 4
                     turtlebot_moving = True
                     self._cmd_pub.publish(twist)
                     #rospy.loginfo('Distance of the obstacle : %f', min_distance)
@@ -167,11 +184,13 @@ class Obstacle():
 
                 min_index = lidar_distances.index(min_distance)
                 if min_distance < SAFE_STOP_DISTANCE*1.5:
-                    if(min_index >= 90):
-                        factor = -1                        
-                    else:
-                        factor = 1
+                    if(TMR_cooldown > 0):
+                        if(min_index >= 90):
+                            factor = -1                        
+                        else:
+                            factor = 1
                     
+                    TMR_cooldown -= 1
                     twist.linear.x = 0
                     twist.angular.z = 1*factor
                     turtlebot_moving = False
@@ -179,10 +198,21 @@ class Obstacle():
                 else:
                     twist.linear.x = LINEAR_VEL
                     twist.angular.z = 0.0
+                    TMR_cooldown = 4
                     turtlebot_moving = True
             
+            accum_speed += abs(twist.linear.x)
+            speed_updates += 1
             self._cmd_pub.publish(twist)
             #rospy.loginfo('Distance of the obstacle : %f', min_distance)
+        
+        # after shutdown
+        # Print run stats
+        rospy.loginfo('---- STATS ----')
+        rospy.loginfo('Time elapsed: %i', run_time)
+        rospy.loginfo('Victims found: %i', victims_found)
+        rospy.loginfo('Total collisions: %i', collision_counter)
+        rospy.loginfo('Average speed: %f', accum_speed/speed_updates)
 
 def main():
     rospy.init_node('turtlebot3_obstacle')
