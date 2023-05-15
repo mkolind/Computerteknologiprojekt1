@@ -109,9 +109,7 @@ class Obstacle():
             left_lidar_samples = scan.ranges[left_lidar_samples_ranges:]
             right_lidar_samples = scan.ranges[:right_lidar_samples_ranges]
             scan_filter.extend(left_lidar_samples + right_lidar_samples)
-        #rospy.loginfo(samples_view)
-        #rospy.loginfo(scan_filter) 
-        null_count = 0
+        
         # Filtering all values to eliminate faulty scans.
         for i in range(samples_view): 
             if scan_filter[i] == 0.0:
@@ -122,7 +120,6 @@ class Obstacle():
                 null_count = null_count + 1
             elif math.isnan(scan_filter[i]):
                 scan_filter[i] = 0.01
-        #rospy.loginfo(null_count)
         return scan_filter
 
 
@@ -223,42 +220,32 @@ class Obstacle():
                 min_distance = min(lidar_distances) 
                 # If there is a small opening ahead, go for it
                 if min(small_front_cone) > SAFE_STOP_DISTANCE*2:
-                    
                     # Drive straight ahead
                     twist.linear.x = LINEAR_VEL
                     # Reset the TMR cooldown as we exit a rotation.
                     TMR_cooldown = 4
                     turtlebot_moving = True 
                 # if the bot sees nothing                   
-                else:
-                    # If the obstacle is too close in the 180 degrees
-                    if min(small_front_cone) < SAFE_STOP_DISTANCE*1.5:
+                else:                  
                         
-                        # If the bot hasn't completed too many rotations. If the TMR goes 
-                        # below the threshold, we dont change the factor and it will 
-                        # continue to turn in the same direction
-                        if(TMR_cooldown > 0):
-                            # Figure out if the obstacle is closest to the left or right 
-                            min_index = lidar_distances.index(min_distance)
-                            # Turning right
-                            if(min_index >= 90):
-                                factor = -1
-                            # Turning left                        
-                            else:
-                                factor = 1
-                        # As we just completed a rotation start the countdown
-                        TMR_cooldown -= 1
-                        # Turn on the spot
-                        twist.linear.x = 0
-                        twist.angular.z = factor
-                        turtlebot_moving = False
-                    # If there isn't an obstacle inside of the degrees
-                    #else:
-                        #rospy.loginfo('wtf')
-                        #twist.linear.x = LINEAR_VEL
-                        #twist.angular.z = 0.0
-                        #TMR_cooldown = 4
-                        #turtlebot_moving = True
+                    # If the bot hasn't completed too many rotations. If the TMR goes 
+                    # below the threshold, we dont change the factor and it will 
+                    # continue to turn in the same direction
+                    if(TMR_cooldown > 0):
+                        # Figure out if the obstacle is closest to the left or right 
+                        min_index = lidar_distances.index(min_distance)
+                        # Turning right
+                        if(min_index >= 90):
+                            factor = -1
+                        # Turning left                        
+                        else:
+                            factor = 1
+                    # As we just completed a rotation start the countdown
+                    TMR_cooldown -= 1
+                    # Turn on the spot
+                    twist.linear.x = 0
+                    twist.angular.z = factor
+                    turtlebot_moving = False
             # Log the speed and updates
             accum_speed += abs(twist.linear.x)
             speed_updates += 1
