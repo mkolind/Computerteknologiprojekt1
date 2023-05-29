@@ -25,8 +25,8 @@ from sensor_msgs.msg import LaserScan
 from geometry_msgs.msg import Twist
 
 LINEAR_VEL = 1
-STOP_DISTANCE = 0.2
-LIDAR_ERROR = 0.05
+STOP_DISTANCE = 0.15
+LIDAR_ERROR = 0.10
 SAFE_STOP_DISTANCE = STOP_DISTANCE + LIDAR_ERROR
 SAFE_TURN_DISTANCE = SAFE_STOP_DISTANCE * 2
 COLLISION_DIST = 0.1
@@ -118,8 +118,6 @@ class Obstacle():
             if scan_filter[i] == float('Inf'):
                 scan_filter[i] = 3.5
                 
-            elif math.isnan(scan_filter[i]):
-                scan_filter[i] = 0.01
         return scan_filter
 
 
@@ -167,7 +165,7 @@ class Obstacle():
             lidar_distances = self.get_scan(180)
             # Dividing scans into different "cones" with overlap
             small_front_cone = lidar_distances[80:100] # 20 Degrees
-            front_cone = lidar_distances[55:125] # 60 Degrees + 10 pga lorte robot
+            front_cone = lidar_distances[60:120] # 60 Degrees 
             left_cone = lidar_distances[0:67] # 67 Degrees
             right_cone = lidar_distances[113:180] # 67 Degrees
 
@@ -193,12 +191,11 @@ class Obstacle():
                         #min_index = lidar_distances.index(min_distance)
                         min_index = front_cone.index(min(front_cone))
                         # To the left
-                        if min_index < 35: #90
+                        if min_index < 30:
                             factor = 1
-                            
+                           
                         # To the right
                         else:
-                        
                             factor = -1
 
                         # Assign the "speed" and the turn of the bot
