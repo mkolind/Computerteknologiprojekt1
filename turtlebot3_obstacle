@@ -172,7 +172,7 @@ class Obstacle():
             # If the bot is moving (forwards or forwards and turning)
             if turtlebot_moving:
                 # Get the minimum distance of the center 60 degrees
-                min_distance = min(small_front_cone) # aendre til front_cone
+                min_distance = min(small_front_cone)
                 
                 # if we are too close to a wall
                 if min_distance < SAFE_STOP_DISTANCE:
