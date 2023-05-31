@@ -29,7 +29,7 @@ STOP_DISTANCE = 0.15
 LIDAR_ERROR = 0.10
 SAFE_STOP_DISTANCE = STOP_DISTANCE + LIDAR_ERROR
 SAFE_TURN_DISTANCE = SAFE_STOP_DISTANCE * 2
-COLLISION_DIST = 0.1
+COLLISION_DIST = 0 + LIDAR_ERROR
 
 
 # Class for RGB-sensor.
@@ -166,8 +166,7 @@ class Obstacle():
             # Dividing scans into different "cones" with overlap
             small_front_cone = lidar_distances[80:100] # 20 Degrees
             front_cone = lidar_distances[60:120] # 60 Degrees 
-            left_cone = lidar_distances[0:67] # 67 Degrees
-            right_cone = lidar_distances[113:180] # 67 Degrees
+         
 
             # If the bot is moving (forwards or forwards and turning)
             if turtlebot_moving:
